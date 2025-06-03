@@ -79,8 +79,15 @@
                         <div class="col-md-6">
                             <label for="modelSelect" class="form-label">Model</label>
                             <select class="form-select" id="modelSelect">
-                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                                <option value="gpt-4">GPT-4</option>
+                                <optgroup label="OpenAI Models">
+                                    <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                    <option value="gpt-4">GPT-4</option>
+                                </optgroup>
+                                <optgroup label="Claude Models">
+                                    <option value="claude-3-opus-20240229">Claude 3 Opus</option>
+                                    <option value="claude-3-5-sonnet-20241022">Claude 3 Sonnet</option>
+                                    <option value="claude-3-haiku-20240307">Claude 3 Haiku</option>
+                                </optgroup>
                             </select>
                         </div>
                         <div class="col-md-6">
@@ -263,6 +270,8 @@ document.addEventListener('DOMContentLoaded', function() {
         const model = document.getElementById('modelSelect').value;
         const temp = parseFloat(temperature.value);
         const maxToks = parseInt(maxTokens.value);
+        
+        console.log('Selected model:', model); // Debug log
         
         try {
             const response = await fetch('/prompts/run/', {

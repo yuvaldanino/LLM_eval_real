@@ -8,17 +8,23 @@ import json
 import time
 import tiktoken
 from openai import OpenAI
+import anthropic
 from django.conf import settings
 from .models import PromptRun
 from .utils import run_prompt
 import os
 
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+anthropic_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
 
 def get_token_count(text, model="gpt-3.5-turbo"):
     """Get the number of tokens in a text string."""
     try:
-        encoding = tiktoken.encoding_for_model(model)
+        if model.startswith("claude"):
+            # Claude uses a different tokenizer, but we can use GPT-3.5's as an approximation
+            encoding = tiktoken.encoding_for_model("gpt-3.5-turbo")
+        else:
+            encoding = tiktoken.encoding_for_model(model)
         return len(encoding.encode(text))
     except:
         # Fallback to cl100k_base encoding if model not found
@@ -29,7 +35,10 @@ def get_model_cost(model, input_tokens, output_tokens):
     """Calculate the cost based on the model and token counts."""
     costs = {
         "gpt-3.5-turbo": {"input": 0.0015, "output": 0.002},
-        "gpt-4": {"input": 0.03, "output": 0.06}
+        "gpt-4": {"input": 0.03, "output": 0.06},
+        "claude-3-opus-20240229": {"input": 0.015, "output": 0.075},
+        "claude-3-5-sonnet-20241022": {"input": 0.003, "output": 0.015},
+        "claude-3-haiku-20240307": {"input": 0.00025, "output": 0.00125}
     }
     
     if model not in costs:
@@ -56,6 +65,8 @@ def run_prompt(request):
         temperature = float(data.get('temperature', 0.7))
         max_tokens = int(data.get('max_tokens', 1000))
 
+        print(f"Received model name: {model}")  # Debug log
+
         # Validate template
         if not template:
             return JsonResponse({
@@ -71,20 +82,36 @@ def run_prompt(request):
         # Get input token count
         input_tokens = get_token_count(prompt, model)
 
-        # Call OpenAI API
+        # Call appropriate API based on model
         start_time = time.time()
-        response = client.chat.completions.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=temperature,
-            max_tokens=max_tokens
-        )
-        end_time = time.time()
+        
+        if model.startswith("claude"):
+            # Call Anthropic API
+            response = anthropic_client.messages.create(
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                messages=[{
+                    "role": "user",
+                    "content": prompt
+                }]
+            )
+            response_text = response.content[0].text
+            output_tokens = response.usage.output_tokens
+            total_tokens = response.usage.input_tokens + response.usage.output_tokens
+        else:
+            # Call OpenAI API
+            response = client.chat.completions.create(
+                model=model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=temperature,
+                max_tokens=max_tokens
+            )
+            response_text = response.choices[0].message.content
+            output_tokens = response.usage.completion_tokens
+            total_tokens = response.usage.total_tokens
 
-        # Get response and token counts
-        response_text = response.choices[0].message.content
-        output_tokens = response.usage.completion_tokens
-        total_tokens = response.usage.total_tokens
+        end_time = time.time()
 
         # Calculate metrics
         response_time = end_time - start_time
