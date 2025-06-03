@@ -7,9 +7,34 @@
     .prompt-editor {
         min-height: 200px;
         font-family: monospace;
+        font-size: 14px;
+        line-height: 1.6;
     }
     .variable-input {
         background-color: #f8f9fa;
+    }
+    .variable-tag {
+        background-color: #e9ecef;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-family: monospace;
+        color: #0d6efd;
+    }
+    .metrics-card {
+        background-color: #f8f9fa;
+        border-left: 4px solid #0d6efd;
+    }
+    .copy-btn {
+        cursor: pointer;
+        transition: all 0.2s;
+    }
+    .copy-btn:hover {
+        transform: scale(1.05);
+    }
+    .validation-error {
+        color: #dc3545;
+        font-size: 0.875rem;
+        margin-top: 0.25rem;
     }
 </style>
 {% endblock %}
@@ -17,9 +42,12 @@
 {% block content %}
 <div class="row">
     <div class="col-md-8">
-        <div class="card">
-            <div class="card-header">
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
                 <h5 class="card-title mb-0">Prompt Editor</h5>
+                <div class="text-muted">
+                    <span id="charCount">0</span> characters
+                </div>
             </div>
             <div class="card-body">
                 <form id="promptForm">
@@ -27,16 +55,32 @@
                         <label for="promptTemplate" class="form-label">Prompt Template</label>
                         <textarea class="form-control prompt-editor" id="promptTemplate" rows="6" 
                                 placeholder="Enter your prompt template here. Use {{variable_name}} for variables."></textarea>
+                        <div id="templateValidation" class="validation-error"></div>
                     </div>
                     <div id="variableInputs" class="mb-3">
                         <!-- Variable inputs will be dynamically added here -->
                     </div>
+                    <div class="row mb-3">
+                        <div class="col-md-6">
+                            <label for="modelSelect" class="form-label">Model</label>
+                            <select class="form-select" id="modelSelect">
+                                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                                <option value="gpt-4">GPT-4</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="temperature" class="form-label">Temperature</label>
+                            <input type="range" class="form-range" id="temperature" min="0" max="1" step="0.1" value="0.7">
+                            <div class="d-flex justify-content-between">
+                                <small>More Focused</small>
+                                <small id="temperatureValue">0.7</small>
+                                <small>More Creative</small>
+                            </div>
+                        </div>
+                    </div>
                     <div class="mb-3">
-                        <label for="modelSelect" class="form-label">Model</label>
-                        <select class="form-select" id="modelSelect">
-                            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                            <option value="gpt-4">GPT-4</option>
-                        </select>
+                        <label for="maxTokens" class="form-label">Max Tokens</label>
+                        <input type="number" class="form-control" id="maxTokens" value="1000" min="1" max="4000">
                     </div>
                     <button type="submit" class="btn btn-primary">
                         <i class="fas fa-play me-2"></i>Run Prompt
@@ -46,7 +90,7 @@
         </div>
     </div>
     <div class="col-md-4">
-        <div class="card">
+        <div class="card mb-4">
             <div class="card-header">
                 <h5 class="card-title mb-0">Results</h5>
             </div>
@@ -54,6 +98,37 @@
                 <div id="results">
                     <div class="alert alert-info">
                         Run a prompt to see results here.
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Metrics</h5>
+            </div>
+            <div class="card-body">
+                <div id="metrics" class="metrics-card p-3">
+                    <div class="row">
+                        <div class="col-6 mb-2">
+                            <small class="text-muted">Input Tokens</small>
+                            <div id="inputTokens">-</div>
+                        </div>
+                        <div class="col-6 mb-2">
+                            <small class="text-muted">Output Tokens</small>
+                            <div id="outputTokens">-</div>
+                        </div>
+                        <div class="col-6 mb-2">
+                            <small class="text-muted">Total Tokens</small>
+                            <div id="totalTokens">-</div>
+                        </div>
+                        <div class="col-6 mb-2">
+                            <small class="text-muted">Estimated Cost</small>
+                            <div id="estimatedCost">-</div>
+                        </div>
+                        <div class="col-12">
+                            <small class="text-muted">Response Time</small>
+                            <div id="responseTime">-</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -68,10 +143,15 @@ document.addEventListener('DOMContentLoaded', function() {
     const promptTemplate = document.getElementById('promptTemplate');
     const variableInputs = document.getElementById('variableInputs');
     const promptForm = document.getElementById('promptForm');
+    const charCount = document.getElementById('charCount');
+    const templateValidation = document.getElementById('templateValidation');
+    const temperature = document.getElementById('temperature');
+    const temperatureValue = document.getElementById('temperatureValue');
+    const maxTokens = document.getElementById('maxTokens');
 
     // Function to extract variables from prompt template
     function extractVariables(template) {
-        const regex = /{{([^}]+)}}/g;
+        const regex = /\{\{([^}]+)\}\}/g;
         const variables = new Set();
         let match;
         while ((match = regex.exec(template)) !== null) {
@@ -80,24 +160,63 @@ document.addEventListener('DOMContentLoaded', function() {
         return Array.from(variables);
     }
 
+    // Function to validate variable syntax
+    function validateTemplate(template) {
+        const regex = /\{\{([^}]+)\}\}/g;
+        let match;
+        let lastIndex = 0;
+        let errors = [];
+
+        while ((match = regex.exec(template)) !== null) {
+            const varName = match[1].trim();
+            if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(varName)) {
+                errors.push('Invalid variable name: ' + varName);
+            }
+            lastIndex = match.index + match[0].length;
+        }
+
+        if (lastIndex < template.length) {
+            const remaining = template.slice(lastIndex);
+            if (remaining.includes('{') || remaining.includes('}')) {
+                errors.push('Unclosed variable brackets detected');
+            }
+        }
+
+        return errors;
+    }
+
     // Function to update variable inputs
     function updateVariableInputs() {
         const template = promptTemplate.value;
         const variables = extractVariables(template);
+        const errors = validateTemplate(template);
+        
+        // Update character count
+        charCount.textContent = template.length;
+        
+        // Show validation errors
+        if (errors.length > 0) {
+            templateValidation.innerHTML = errors.map(function(error) {
+                return '<div class="text-danger">' + error + '</div>';
+            }).join('');
+        } else {
+            templateValidation.innerHTML = '';
+        }
         
         // Clear existing inputs
         variableInputs.innerHTML = '';
         
         // Add new inputs
-        variables.forEach(variable => {
+        variables.forEach(function(variable) {
             const div = document.createElement('div');
             div.className = 'mb-3';
-            div.innerHTML = `
-                <label for="var_${variable}" class="form-label">${variable}</label>
-                <input type="text" class="form-control variable-input" 
-                       id="var_${variable}" name="${variable}" 
-                       placeholder="Enter value for ${variable}">
-            `;
+            div.innerHTML = 
+                '<label for="var_' + variable + '" class="form-label">' +
+                variable + ' <span class="variable-tag">\\{{' + variable + '}}</span>' +
+                '</label>' +
+                '<input type="text" class="form-control variable-input" ' +
+                'id="var_' + variable + '" name="' + variable + '" ' +
+                'placeholder="Enter value for ' + variable + '">';
             variableInputs.appendChild(div);
         });
     }
@@ -105,17 +224,24 @@ document.addEventListener('DOMContentLoaded', function() {
     // Update variables when template changes
     promptTemplate.addEventListener('input', updateVariableInputs);
 
+    // Update temperature value display
+    temperature.addEventListener('input', function() {
+        temperatureValue.textContent = this.value;
+    });
+
     // Handle form submission
     promptForm.addEventListener('submit', async function(e) {
         e.preventDefault();
         
         const template = promptTemplate.value;
         const variables = {};
-        extractVariables(template).forEach(variable => {
-            variables[variable] = document.getElementById(`var_${variable}`).value;
+        extractVariables(template).forEach(function(variable) {
+            variables[variable] = document.getElementById('var_' + variable).value;
         });
         
         const model = document.getElementById('modelSelect').value;
+        const temp = parseFloat(temperature.value);
+        const maxToks = parseInt(maxTokens.value);
         
         try {
             const response = await fetch('/prompts/run/', {
@@ -125,38 +251,58 @@ document.addEventListener('DOMContentLoaded', function() {
                     'X-CSRFToken': getCookie('csrftoken')
                 },
                 body: JSON.stringify({
-                    template,
-                    variables,
-                    model
+                    template: template,
+                    variables: variables,
+                    model: model,
+                    temperature: temp,
+                    max_tokens: maxToks
                 })
             });
             
             const data = await response.json();
             
-            // Update results
-            const resultsDiv = document.getElementById('results');
             if (data.status === 'success') {
-                resultsDiv.innerHTML = `
-                    <div class="alert alert-success">
-                        ${data.message}
-                    </div>
-                `;
+                // Update results
+                document.getElementById('results').innerHTML = 
+                    '<div class="alert alert-success">' +
+                    '<h6>Response:</h6>' +
+                    '<pre class="mb-0">' + data.data.response + '</pre>' +
+                    '<button class="btn btn-sm btn-outline-primary mt-2 copy-btn" ' +
+                    'onclick="copyToClipboard(\'' + data.data.response.replace(/'/g, "\\'") + '\')">' +
+                    '<i class="fas fa-copy me-1"></i>Copy Response' +
+                    '</button>' +
+                    '</div>';
+
+                // Update metrics
+                const metrics = data.data.metrics;
+                document.getElementById('inputTokens').textContent = metrics.input_tokens;
+                document.getElementById('outputTokens').textContent = metrics.output_tokens;
+                document.getElementById('totalTokens').textContent = metrics.total_tokens;
+                document.getElementById('estimatedCost').textContent = '$' + metrics.cost.toFixed(6);
+                document.getElementById('responseTime').textContent = metrics.response_time.toFixed(2) + 's';
             } else {
-                resultsDiv.innerHTML = `
-                    <div class="alert alert-danger">
-                        ${data.message}
-                    </div>
-                `;
+                document.getElementById('results').innerHTML = 
+                    '<div class="alert alert-danger">' +
+                    data.message +
+                    '</div>';
             }
         } catch (error) {
             console.error('Error:', error);
-            document.getElementById('results').innerHTML = `
-                <div class="alert alert-danger">
-                    An error occurred while running the prompt.
-                </div>
-            `;
+            document.getElementById('results').innerHTML = 
+                '<div class="alert alert-danger">' +
+                'An error occurred while running the prompt.' +
+                '</div>';
         }
     });
+
+    // Function to copy text to clipboard
+    window.copyToClipboard = function(text) {
+        navigator.clipboard.writeText(text).then(function() {
+            alert('Copied to clipboard!');
+        }).catch(function(err) {
+            console.error('Failed to copy:', err);
+        });
+    };
 
     // Function to get CSRF token
     function getCookie(name) {

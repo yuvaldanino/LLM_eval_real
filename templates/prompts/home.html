@@ -10,7 +10,7 @@
             Test, optimize, and compare LLM prompts with real-time cost, token usage, and output tracking.
         </p>
         {% if user.is_authenticated %}
-            <a href="{% url 'prompts:prompt_editor' %}" class="btn btn-primary btn-lg">
+            <a href="{% url 'prompts:editor' %}" class="btn btn-primary btn-lg">
                 <i class="fas fa-rocket me-2"></i>Start Creating Prompts
             </a>
         {% else %}

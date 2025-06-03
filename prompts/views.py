@@ -1,72 +1,114 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
 from django.http import JsonResponse
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.csrf import csrf_exempt
 from django.core.paginator import Paginator
 import json
+import time
+import tiktoken
+from openai import OpenAI
+from django.conf import settings
 from .models import PromptRun
 from .utils import run_prompt
+import os
+
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+
+def get_token_count(text, model="gpt-3.5-turbo"):
+    """Get the number of tokens in a text string."""
+    try:
+        encoding = tiktoken.encoding_for_model(model)
+        return len(encoding.encode(text))
+    except:
+        # Fallback to cl100k_base encoding if model not found
+        encoding = tiktoken.get_encoding("cl100k_base")
+        return len(encoding.encode(text))
+
+def get_model_cost(model, input_tokens, output_tokens):
+    """Calculate the cost based on the model and token counts."""
+    costs = {
+        "gpt-3.5-turbo": {"input": 0.0015, "output": 0.002},
+        "gpt-4": {"input": 0.03, "output": 0.06}
+    }
+    
+    if model not in costs:
+        return 0
+    
+    return (input_tokens * costs[model]["input"] + 
+            output_tokens * costs[model]["output"]) / 1000
 
 # Create your views here.
 
 @login_required
-def prompt_editor(request):
-    """View for the prompt editor page."""
+def editor(request):
     return render(request, 'prompts/editor.html')
 
 @login_required
-@require_http_methods(['POST'])
-def run_prompt_view(request):
-    """API endpoint to run a prompt."""
+@csrf_exempt
+@require_http_methods(["POST"])
+def run_prompt(request):
     try:
         data = json.loads(request.body)
-        template = data.get('template')
+        template = data.get('template', '')
         variables = data.get('variables', {})
-        model_name = data.get('model')
-        
-        if not all([template, model_name]):
+        model = data.get('model', 'gpt-3.5-turbo')
+        temperature = float(data.get('temperature', 0.7))
+        max_tokens = int(data.get('max_tokens', 1000))
+
+        # Validate template
+        if not template:
             return JsonResponse({
                 'status': 'error',
-                'message': 'Missing required fields'
-            }, status=400)
-        
-        # Run the prompt
-        result = run_prompt(template, variables, model_name)
-        
-        # Save the run
-        prompt_run = PromptRun.objects.create(
-            user=request.user,
-            template=template,
-            variables=variables,
-            model_name=model_name,
-            response=result['response'],
-            input_tokens=result['input_tokens'],
-            output_tokens=result['output_tokens'],
-            total_tokens=result['total_tokens'],
-            cost=result['cost'],
-            response_time=result['response_time']
+                'message': 'Prompt template cannot be empty'
+            })
+
+        # Replace variables in template
+        prompt = template
+        for var_name, var_value in variables.items():
+            prompt = prompt.replace(f"{{{{{var_name}}}}}", str(var_value))
+
+        # Get input token count
+        input_tokens = get_token_count(prompt, model)
+
+        # Call OpenAI API
+        start_time = time.time()
+        response = client.chat.completions.create(
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=temperature,
+            max_tokens=max_tokens
         )
-        
+        end_time = time.time()
+
+        # Get response and token counts
+        response_text = response.choices[0].message.content
+        output_tokens = response.usage.completion_tokens
+        total_tokens = response.usage.total_tokens
+
+        # Calculate metrics
+        response_time = end_time - start_time
+        cost = get_model_cost(model, input_tokens, output_tokens)
+
         return JsonResponse({
             'status': 'success',
             'data': {
-                'id': prompt_run.id,
-                'response': result['response'],
+                'response': response_text,
                 'metrics': {
-                    'input_tokens': result['input_tokens'],
-                    'output_tokens': result['output_tokens'],
-                    'total_tokens': result['total_tokens'],
-                    'cost': float(result['cost']),
-                    'response_time': result['response_time']
+                    'input_tokens': input_tokens,
+                    'output_tokens': output_tokens,
+                    'total_tokens': total_tokens,
+                    'cost': cost,
+                    'response_time': response_time
                 }
             }
         })
-        
+
     except Exception as e:
         return JsonResponse({
             'status': 'error',
             'message': str(e)
-        }, status=400)
+        })
 
 @login_required
 def prompt_history(request):
