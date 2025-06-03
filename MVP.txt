@@ -1,0 +1,240 @@
+# PromptPilot MVP Specification
+
+## 1. Core Features
+
+### 1.1 Prompt Editor
+- Textarea for prompt template input
+- Variable detection system ({{var_name}} syntax)
+- Dynamic input field generation for detected variables
+- Real-time validation of variable syntax
+- Support for multiple variables in a single prompt
+- Clear button to reset the editor
+- Character count display
+
+### 1.2 Model Selection
+- Dropdown menu for model selection
+- Initial models:
+  - GPT-3.5-turbo
+  - GPT-4
+- Display of model specifications:
+  - Cost per 1K tokens
+  - Max tokens
+  - Model capabilities
+- Model-specific settings (temperature, max tokens)
+
+### 1.3 Run Prompt System
+- Variable value injection into prompt template
+- OpenAI API integration
+- Metrics tracking:
+  - Input tokens
+  - Output tokens
+  - Total tokens
+  - Estimated cost
+  - Response time
+- Error handling for:
+  - API failures
+  - Rate limits
+  - Invalid prompts
+  - Missing variables
+
+### 1.4 Results Viewer
+- Display sections:
+  - Final prompt (with variables injected)
+  - Model response
+  - Token usage breakdown
+  - Cost calculation
+  - Response time
+- Copy buttons for:
+  - Full response
+  - Prompt template
+  - Variable values
+- Export functionality (JSON/CSV)
+- Clear formatting for readability
+
+### 1.5 Prompt History
+- Local storage of recent runs
+- History entry includes:
+  - Prompt template
+  - Variable values
+  - Model used
+  - Response
+  - Metrics
+- Ability to:
+  - Load previous runs
+  - Edit and re-run
+  - Delete history entries
+  - Clear all history
+
+## 2. Technical Implementation
+
+### 2.1 Backend (Django)
+- Project Structure:
+  ```
+  /backend
+    /promptapi
+      models.py
+      views.py
+      urls.py
+      serializers.py
+      utils.py
+    /config
+      settings.py
+      urls.py
+    requirements.txt
+    manage.py
+  ```
+
+- API Endpoints:
+  - POST /api/run-prompt/
+    - Input: prompt template, variables, model selection
+    - Output: response, metrics, status
+  - GET /api/models/
+    - Output: available models and specifications
+  - POST /api/save-run/
+    - Input: prompt run data
+    - Output: saved run ID
+  - GET /api/history/
+    - Output: list of saved runs
+
+- Required Packages:
+  - django
+  - djangorestframework
+  - django-cors-headers
+  - openai
+  - tiktoken
+  - python-dotenv
+
+### 2.2 Frontend (React)
+- Project Structure:
+  ```
+  /frontend
+    /src
+      /components
+        PromptEditor.jsx
+        VariableInputForm.jsx
+        ModelSelector.jsx
+        ResultViewer.jsx
+        HistoryList.jsx
+      /hooks
+        usePromptRun.js
+        useHistory.js
+      /utils
+        tokenCounter.js
+        costCalculator.js
+      App.jsx
+      index.jsx
+    package.json
+  ```
+
+- Required Packages:
+  - react
+  - react-dom
+  - axios
+  - tailwindcss
+  - @heroicons/react
+  - react-toastify
+
+### 2.3 Database Schema (PostgreSQL)
+- PromptRun Model:
+  ```python
+  class PromptRun(models.Model):
+      prompt_template = models.TextField()
+      variables = models.JSONField()
+      model_name = models.CharField(max_length=50)
+      response = models.TextField()
+      input_tokens = models.IntegerField()
+      output_tokens = models.IntegerField()
+      total_tokens = models.IntegerField()
+      cost = models.DecimalField(max_digits=10, decimal_places=6)
+      response_time = models.FloatField()
+      created_at = models.DateTimeField(auto_now_add=True)
+  ```
+
+## 3. Development Phases
+
+### Phase 1: Project Setup
+1. Initialize Django project
+2. Set up React project
+3. Configure CORS
+4. Set up environment variables
+5. Create basic project structure
+
+### Phase 2: Core Functionality
+1. Implement prompt editor
+2. Add variable detection
+3. Create model selector
+4. Set up OpenAI integration
+5. Implement basic results display
+
+### Phase 3: Enhanced Features
+1. Add token counting
+2. Implement cost calculation
+3. Add response time tracking
+4. Create copy/export functionality
+5. Implement error handling
+
+### Phase 4: History System
+1. Create database models
+2. Implement save functionality
+3. Add history viewer
+4. Create load/edit features
+5. Add delete functionality
+
+## 4. Testing Requirements
+
+### 4.1 Backend Tests
+- API endpoint tests
+- Token counting accuracy
+- Cost calculation verification
+- Error handling scenarios
+- Database operations
+
+### 4.2 Frontend Tests
+- Component rendering
+- User interaction flows
+- Variable injection
+- History management
+- Error state handling
+
+## 5. Security Considerations
+
+### 5.1 API Security
+- Environment variable management
+- API key protection
+- Rate limiting
+- Input validation
+- CORS configuration
+
+### 5.2 Data Security
+- Secure storage of prompt history
+- Data sanitization
+- User input validation
+- Error message security
+
+## 6. Performance Requirements
+
+### 6.1 Response Times
+- Prompt execution: < 5 seconds
+- History loading: < 1 second
+- Variable detection: < 100ms
+
+### 6.2 Resource Usage
+- Memory usage: < 500MB
+- Database size: < 1GB
+- API call frequency: < 10 calls/minute
+
+## 7. Future Enhancements
+
+### 7.1 Planned Features
+- Multiple model comparison
+- CSV/context file upload
+- Prompt versioning
+- Additional model support
+- Prompt scoring system
+
+### 7.2 Technical Improvements
+- Caching system
+- WebSocket integration
+- Advanced error recovery
+- Performance optimization
+- Analytics dashboard 

@@ -1,0 +1,128 @@
+{% extends 'base.html' %}
+
+{% block title %}PromptPilot - History{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">Prompt History</h5>
+                <button class="btn btn-outline-danger btn-sm" id="clearHistory">
+                    <i class="fas fa-trash me-2"></i>Clear History
+                </button>
+            </div>
+            <div class="card-body">
+                <div id="historyList">
+                    <div class="alert alert-info">
+                        No prompt history available yet.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const historyList = document.getElementById('historyList');
+    const clearHistoryBtn = document.getElementById('clearHistory');
+
+    // Function to load history
+    async function loadHistory() {
+        try {
+            const response = await fetch('/prompts/history/');
+            const data = await response.json();
+            
+            if (data.history && data.history.length > 0) {
+                historyList.innerHTML = data.history.map(item => `
+                    <div class="card mb-3">
+                        <div class="card-body">
+                            <h6 class="card-subtitle mb-2 text-muted">
+                                ${new Date(item.created_at).toLocaleString()}
+                            </h6>
+                            <p class="card-text">
+                                <strong>Template:</strong><br>
+                                <code>${item.template}</code>
+                            </p>
+                            <p class="card-text">
+                                <strong>Variables:</strong><br>
+                                <code>${JSON.stringify(item.variables, null, 2)}</code>
+                            </p>
+                            <p class="card-text">
+                                <strong>Model:</strong> ${item.model}<br>
+                                <strong>Tokens:</strong> ${item.tokens}<br>
+                                <strong>Cost:</strong> $${item.cost}
+                            </p>
+                            <button class="btn btn-primary btn-sm" onclick="reloadPrompt(${item.id})">
+                                <i class="fas fa-redo me-2"></i>Reload
+                            </button>
+                        </div>
+                    </div>
+                `).join('');
+            } else {
+                historyList.innerHTML = `
+                    <div class="alert alert-info">
+                        No prompt history available yet.
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            historyList.innerHTML = `
+                <div class="alert alert-danger">
+                    An error occurred while loading history.
+                </div>
+            `;
+        }
+    }
+
+    // Function to clear history
+    async function clearHistory() {
+        if (confirm('Are you sure you want to clear all prompt history?')) {
+            try {
+                const response = await fetch('/prompts/history/clear/', {
+                    method: 'POST',
+                    headers: {
+                        'X-CSRFToken': getCookie('csrftoken')
+                    }
+                });
+                
+                if (response.ok) {
+                    loadHistory();
+                } else {
+                    throw new Error('Failed to clear history');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Failed to clear history');
+            }
+        }
+    }
+
+    // Function to get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // Load history on page load
+    loadHistory();
+
+    // Add event listener for clear history button
+    clearHistoryBtn.addEventListener('click', clearHistory);
+});
+</script>
+{% endblock %} 

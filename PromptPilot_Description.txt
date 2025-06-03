@@ -1,0 +1,108 @@
+🧠 Project Name (Placeholder): PromptPilot
+
+A developer tool for testing, optimizing, and comparing LLM prompts — with real-time cost, token usage, and output tracking.
+✅ Core MVP Features
+
+1. Prompt Editor with Variables
+Textarea for the prompt template (e.g., "Summarize: {{message_text}}")
+Detect variables like {{message_text}} dynamically
+Show input boxes for each variable
+2. Model Selection
+Dropdown for model choice (start with):
+GPT-3.5
+GPT-4
+Show estimated cost per 1K tokens for each
+3. Run Prompt
+Inject variable values into prompt template
+Call selected model via OpenAI API
+Record:
+Output
+Tokens used
+Estimated cost
+Latency
+4. Results Viewer
+Show:
+Final prompt sent
+Raw model response
+Token count
+Cost
+Time taken
+Nice UX for copy/share/save
+5. Prompt History (Optional MVP)
+Save recent prompt runs in DB (prompt + variables + result)
+Show a list of previous runs to re-load and test again
+6. Responsive UI
+Clean layout
+Dark/light toggle (bonus)
+Clear separation between input, model selection, and results
+🧰 Tech Stack
+
+🔙 Backend
+Tool	Purpose
+Django	Main backend framework
+Django REST Framework	API endpoints for prompt runs
+OpenAI Python SDK	Calling GPT-3.5/4
+tiktoken	Token usage calculation
+PostgreSQL	Store prompt templates + results (optional)
+CORS Headers	Enable frontend → backend communication
+🔜 Frontend
+Tool	Purpose
+React	Frontend framework
+Tailwind CSS	UI styling
+Axios or fetch	API requests
+Vercel	Hosting the frontend
+🗂️ Folder Structure
+
+Django Backend
+/backend
+  /promptapi
+    models.py       # Optional: PromptRun model
+    views.py        # Endpoint to run prompt
+    urls.py
+    serializers.py  # For API responses
+  settings.py
+  urls.py
+React Frontend
+/frontend
+  /components
+    PromptEditor.jsx
+    VariableInputForm.jsx
+    ModelSelector.jsx
+    ResultViewer.jsx
+  App.jsx
+  index.jsx
+🛠️ MVP Build Plan
+
+✅ Phase 1: Setup
+ Create Django backend with CORS enabled
+ Create base React app (hosted on Vercel)
+ Connect backend + frontend
+✍️ Phase 2: Prompt Engine
+ Build prompt editor component
+ Parse variables from prompt string ({{var}})
+ Show input boxes for each var
+🚀 Phase 3: API Endpoint
+ Django view to:
+Accept prompt template, variables, model name
+Inject variables into prompt
+Call OpenAI API
+Return output, token usage, cost, response time
+ Use tiktoken to estimate tokens
+📊 Phase 4: Results View
+ Display final prompt + response
+ Display cost, token usage, latency
+ Add copy/export button
+🧠 Phase 5 (Bonus MVP):
+ Save prompt runs to DB
+ Show prompt history
+ Re-run/edit previous prompts
+✨ Bonus Features (Add Later)
+
+Compare outputs across models (side-by-side)
+Upload CSV or context file
+Prompt versioning / diff viewer
+Claude / Mistral support
+Prompt scoring (manual or auto)
+📝 Final Project Pitch (for README or resume)
+
+PromptPilot is a developer tool to optimize and test prompts across LLMs like GPT-4 and GPT-3.5. It features prompt templating, variable injection, real-time token and cost analysis, and a clean UI for analyzing LLM outputs. Built with Django, React, and OpenAI APIs, it helps teams reduce costs and improve model quality before deploying into production.

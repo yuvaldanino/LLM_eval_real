@@ -1,0 +1,178 @@
+{% extends 'base.html' %}
+
+{% block title %}PromptPilot - Editor{% endblock %}
+
+{% block extra_css %}
+<style>
+    .prompt-editor {
+        min-height: 200px;
+        font-family: monospace;
+    }
+    .variable-input {
+        background-color: #f8f9fa;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Prompt Editor</h5>
+            </div>
+            <div class="card-body">
+                <form id="promptForm">
+                    <div class="mb-3">
+                        <label for="promptTemplate" class="form-label">Prompt Template</label>
+                        <textarea class="form-control prompt-editor" id="promptTemplate" rows="6" 
+                                placeholder="Enter your prompt template here. Use {{variable_name}} for variables."></textarea>
+                    </div>
+                    <div id="variableInputs" class="mb-3">
+                        <!-- Variable inputs will be dynamically added here -->
+                    </div>
+                    <div class="mb-3">
+                        <label for="modelSelect" class="form-label">Model</label>
+                        <select class="form-select" id="modelSelect">
+                            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+                            <option value="gpt-4">GPT-4</option>
+                        </select>
+                    </div>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-play me-2"></i>Run Prompt
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">Results</h5>
+            </div>
+            <div class="card-body">
+                <div id="results">
+                    <div class="alert alert-info">
+                        Run a prompt to see results here.
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const promptTemplate = document.getElementById('promptTemplate');
+    const variableInputs = document.getElementById('variableInputs');
+    const promptForm = document.getElementById('promptForm');
+
+    // Function to extract variables from prompt template
+    function extractVariables(template) {
+        const regex = /{{([^}]+)}}/g;
+        const variables = new Set();
+        let match;
+        while ((match = regex.exec(template)) !== null) {
+            variables.add(match[1].trim());
+        }
+        return Array.from(variables);
+    }
+
+    // Function to update variable inputs
+    function updateVariableInputs() {
+        const template = promptTemplate.value;
+        const variables = extractVariables(template);
+        
+        // Clear existing inputs
+        variableInputs.innerHTML = '';
+        
+        // Add new inputs
+        variables.forEach(variable => {
+            const div = document.createElement('div');
+            div.className = 'mb-3';
+            div.innerHTML = `
+                <label for="var_${variable}" class="form-label">${variable}</label>
+                <input type="text" class="form-control variable-input" 
+                       id="var_${variable}" name="${variable}" 
+                       placeholder="Enter value for ${variable}">
+            `;
+            variableInputs.appendChild(div);
+        });
+    }
+
+    // Update variables when template changes
+    promptTemplate.addEventListener('input', updateVariableInputs);
+
+    // Handle form submission
+    promptForm.addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        const template = promptTemplate.value;
+        const variables = {};
+        extractVariables(template).forEach(variable => {
+            variables[variable] = document.getElementById(`var_${variable}`).value;
+        });
+        
+        const model = document.getElementById('modelSelect').value;
+        
+        try {
+            const response = await fetch('/prompts/run/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify({
+                    template,
+                    variables,
+                    model
+                })
+            });
+            
+            const data = await response.json();
+            
+            // Update results
+            const resultsDiv = document.getElementById('results');
+            if (data.status === 'success') {
+                resultsDiv.innerHTML = `
+                    <div class="alert alert-success">
+                        ${data.message}
+                    </div>
+                `;
+            } else {
+                resultsDiv.innerHTML = `
+                    <div class="alert alert-danger">
+                        ${data.message}
+                    </div>
+                `;
+            }
+        } catch (error) {
+            console.error('Error:', error);
+            document.getElementById('results').innerHTML = `
+                <div class="alert alert-danger">
+                    An error occurred while running the prompt.
+                </div>
+            `;
+        }
+    });
+
+    // Function to get CSRF token
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
+</script>
+{% endblock %} 

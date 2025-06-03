@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}PromptPilot - Home{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 text-center">
+        <h1 class="display-4 mb-4">Welcome to PromptPilot</h1>
+        <p class="lead mb-4">
+            Test, optimize, and compare LLM prompts with real-time cost, token usage, and output tracking.
+        </p>
+        {% if user.is_authenticated %}
+            <a href="{% url 'prompts:prompt_editor' %}" class="btn btn-primary btn-lg">
+                <i class="fas fa-rocket me-2"></i>Start Creating Prompts
+            </a>
+        {% else %}
+            <div class="d-grid gap-2 d-sm-flex justify-content-sm-center">
+                <a href="{% url 'account_login' %}" class="btn btn-primary btn-lg px-4 gap-3">
+                    <i class="fas fa-sign-in-alt me-2"></i>Login
+                </a>
+                <a href="{% url 'account_signup' %}" class="btn btn-outline-secondary btn-lg px-4">
+                    <i class="fas fa-user-plus me-2"></i>Sign Up
+                </a>
+            </div>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row mt-5">
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-code fa-3x mb-3 text-primary"></i>
+                <h3 class="card-title">Prompt Editor</h3>
+                <p class="card-text">Create and test prompts with variable support and real-time validation.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-chart-line fa-3x mb-3 text-primary"></i>
+                <h3 class="card-title">Cost Tracking</h3>
+                <p class="card-text">Monitor token usage and costs in real-time as you test your prompts.</p>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card h-100">
+            <div class="card-body text-center">
+                <i class="fas fa-history fa-3x mb-3 text-primary"></i>
+                <h3 class="card-title">Prompt History</h3>
+                <p class="card-text">Save and compare different versions of your prompts for optimization.</p>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %} 
